@@ -4,9 +4,10 @@ import multiprocessing as mp
 from multiprocessing import Manager
 import gc
 import numpy as np
-
+from helper import remove_space
 class WSUtils():
     def __init__(self, VNDict):
+        self.lang = VNDict
         ##################################################################################################
         '''
         The dictionary bellow is normalizing map which is inherited from Dat Quoc Nguyen
@@ -19,6 +20,7 @@ class WSUtils():
             "õe": "oẽ", "ọe": "oẹ", "ùy": "uỳ", "úy": "uý",
             "ủy": "uỷ", "ũy": "uỹ", "ụy": "uỵ", "Ủy": "Uỷ"
         }
+
         ##################################################################################################
         '''
         The RDR_VNDict, VNFamilyName, and VNMiddle are inherited from the work of Dat Quoc Nguyen
@@ -28,8 +30,12 @@ class WSUtils():
         '''
         ##################################################################################################
         self.VNDict       = set(self.read_lines('./dict/' + VNDict + '.txt'))
-        self.VNFamilyName = set(self.read_lines('./dict/VNFamilyName.txt'))
-        self.VNMiddle     = set(self.read_lines('./dict/VNMiddle.txt'))
+        if self.lang=="RDR_VNDict":
+            self.VNFamilyName = set(self.read_lines('./dict/VNFamilyName.txt'))
+            self.VNMiddle     = set(self.read_lines('./dict/VNMiddle.txt'))
+        else:
+            self.VNFamilyName = set(self.read_lines('./dict/ZHFamilyName.txt'))
+            self.VNMiddle     = set(self.read_lines('./dict/ZHFirstName.txt'))
         ##################################################################################################
         self.lower        = '🄰'  # this string indicates for "lower" token style
         self.upper        = '🄱'  # this string indicates for "upper" token style
@@ -45,8 +51,12 @@ class WSUtils():
         seen_words_sfx = set()
 
         for stn in train_stns:
+            stn = stn.replace("~", ' ')
+
             wrds = stn.lower().split(' ')
             for w in wrds:
+                w = w.strip(",.!?):;“”…'([]<>/@#$&^*-_+=`|\" ")
+
                 seen_words.update({w})
                 
                 syl = w.split('_')
@@ -69,8 +79,10 @@ class WSUtils():
         unseen_words_sfx = set()
 
         for stn in test_stns:
+            stn = stn.replace("~", ' ')
             wrds = stn.lower().split(' ')
             for w in wrds:
+                w = w.strip(",.!?):;“”…'([]<>/@#$&^*-_+=`|\" ")
                 syl = w.split('_')
                 sfx = syl[-1]
 
@@ -111,6 +123,7 @@ class WSUtils():
         f = open(file_path, 'r', encoding='utf8')
         for line in f.readlines():
             line_pos = line.replace('\n', '')
+            #ZH
             lines.append(self.normalize_accent(line_pos))
         f.close()
 
@@ -135,10 +148,18 @@ class WSUtils():
             '''
             ######################################
             line_pos = line_pos.replace('_ ', ' ')
+            #ZH
             line_pos = line_pos.replace(' _', ' ')
             ######################################
+
             lines.append(self.normalize_accent(line_pos))
+
         f.close()
+
+        #ZH
+        if self.lang=="RDR_VNDict":
+            lines = remove_space(lines)
+
         return lines
     
     
@@ -233,9 +254,70 @@ class WSUtils():
         Output: True or False
         (Check whether a string in the Vietnamese dictionary)
         '''
+        if syl == "viện kiểm sát.":
+            print(syl)
+
+        syl = syl.strip(",.!?):;“”…'([]<>/@#$&^*-_+=`|\" ")
+        if syl == "viện kiểm sát":
+            print(syl)
+            print(syl in self.VNDict)
         return syl in self.VNDict
-    
-    
+
+    def startMarks(self, syl):
+        '''
+        Input: a string
+        Output: True or False
+        (Check whether a string in the Vietnamese dictionary)
+        '''
+
+        l_syl = syl.lstrip(",.!?):;“”…'([]<>/@#$&^*-_+=`|\" ")
+        left = syl.replace(l_syl, '')
+
+        if left != "":
+            return (True, left)
+        else:
+            return (False, "")
+
+    def endingMarks(self, syl):
+        '''
+        Input: a string
+        Output: True or False
+        (Check whether a string in the Vietnamese dictionary)
+        '''
+        r_syl = syl.rstrip(",.!?):;“”…'([]<>/@#$&^*-_+=`|\" ")
+        right = syl.replace(r_syl, '')
+
+        if right != "":
+            return (True, right)
+        else:
+            return (False, "")
+
+
+
+    def endingCheck(self, syl):
+        '''
+        Input: a string
+        Output: True or False
+        (Check whether a string in the Vietnamese dictionary)
+        '''
+        """
+        r_syl = syl.rstrip(",.!?):;“”…'([]<>/@#$&^*-_+=`|\" ")
+        right = syl.replace(r_syl, '')
+
+        if right != "":
+            return (True, right)
+        else:
+            return (False, "")
+        """
+
+        if syl.endswith(".") or syl.endswith("!") or syl.endswith("?") or syl.endswith("…") or syl.endswith(
+                "...") or syl.endswith("。") or syl.endswith("\".") :
+            return True
+        else:
+            return False
+
+        # return True
+
     def inVNFamilyName(self, syl):
         '''
         Input: a string
@@ -262,12 +344,16 @@ class WSUtils():
 
         # Counting for some n-grams patterns
         for line in training_sentences:
+            line = line.replace("~", " ")
             n_grams   = line.split(' ')
             n_grams_N = len(n_grams)
             for idx, n_gram in enumerate(n_grams):
+                #VI
+                n_gram = n_gram.strip(",.!?):;“”…'([]<>/@#$&^*-_+=`|\" ")
                 tokens          = n_gram.lower().split('_')
                 tokens_original = n_gram.split('_')
                 if 4 < len(tokens) and len(tokens) < 10:
+                    print(n_gram.replace('_', ' ').lower())
                     self.VNDict.update({n_gram.replace('_', ' ').lower()})
                 if len(tokens) == 1:
                     if idx < n_grams_N - 1:
@@ -339,16 +425,20 @@ class WSUtils():
                 - syls: ['bùng', 'phát', 'việc', 'khai', 'thác', 'tự', 'do', 'mỏ', 'sắt', 'Trại', 'Bò']
                 - lbls: [1, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0]
 
+
+
         We have noted that the "label" at the end of a sentence always is "space"! (And no "label" at the begin of sentence)
         '''
         syls, lbls, cur_idx = [], [], 0
         stn = sentence + ' '
         for idx, character in enumerate(stn):
-            if character == ' ' or character == '_':
+            if character == ' ' or character == '_' or character == '~':
                 if character == ' ':
-                    lbls.append(0)
-                else:
                     lbls.append(1)
+                elif character == '~':
+                    lbls.append(2)
+                else:
+                    lbls.append(0)
                 syls.append(stn[cur_idx:idx])
                 cur_idx = idx + 1
                                         
@@ -528,6 +618,10 @@ class WSUtils():
             + The format of key is: [the begin position of word]_[the end position of word]
             + The format of value is: string of word
         '''
+        print(line)
+        line = line.replace("~"," ")
+        print(line)
+        print("Hello Vy Thai")
         tokens = line.split()
         words  = {}
         idx    = 1
@@ -550,11 +644,12 @@ class WSUtils():
         output = ''
         for idx, word in enumerate(syls):
             output = output + word
-            if lbls[idx] == 0:
+            if lbls[idx] == 1:
                 output = output + ' '
-            elif lbls[idx] == 1:
+            elif lbls[idx] == 0:
                 output = output + '_'
-
+            elif lbls[idx] == 2:
+                output = output + '~'
         return output[:-1]
     
     
@@ -573,7 +668,7 @@ class WSUtils():
     
     
     def extract_training_pairs(self, training_sentences):
-        X, Y = [], []        
+        X, Y = [], []
         for sentence in training_sentences:
             syls, lbls   = self.extract_training_sentence(sentence)
             syls_windows = self.extract_syls_windows(syls, lbls)
@@ -593,6 +688,8 @@ class WSUtils():
             nb_correct, nb_output, nb_ref = 0, 0, 0
             nb_stn_correct = 0
             raw_list = [line.replace('_',' ') for line in nor_list]
+            raw_list = [line.replace('~',' ') for line in raw_list]
+
         else:
             raw_list = nor_list
             
@@ -658,7 +755,7 @@ class WSUtils():
                 f1_score = 0
             
             if get_support:
-                return predicted_sentences, [nb_output, nb_ref, nb_correct]
+               return predicted_sentences, [nb_output, nb_ref, nb_correct]
             else:
                 return predicted_sentences, [precision, recall, f1_score]
         
